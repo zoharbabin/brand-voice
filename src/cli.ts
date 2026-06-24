@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, rmSync } from 'fs';
 import { join, resolve, extname } from 'path';
 import { loadGuidelines } from './core/load-guidelines.js';
 import { analyzeText } from './core/analyzer.js';
 import { parseGuidelines } from './core/parse-guidelines.js';
+import { unregisterHook } from './setup/register-hook.js';
+import { unregisterMcp } from './setup/register-mcp.js';
+import { uninstallSkill } from './setup/install-skill.js';
 import type { Violation } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -349,12 +352,80 @@ function cmdBaseline(): void {
 // Arg parsing and dispatch
 // ---------------------------------------------------------------------------
 
+function cmdUninstall(opts: { global: boolean }): void {
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+  const cwd = process.cwd();
+  const removed: string[] = [];
+  const skipped: string[] = [];
+
+  function tryRemove(label: string, path: string): void {
+    if (existsSync(path)) {
+      rmSync(path, { recursive: true, force: true });
+      removed.push(label);
+    } else {
+      skipped.push(label);
+    }
+  }
+
+  // Skill
+  uninstallSkill();
+  removed.push('~/.claude/skills/brand-voice-setup/ (skill)');
+
+  if (opts.global) {
+    // Global: ~/.claude/settings.json hook + ~/.claude/CLAUDE.md injection + ~/.claude/brand-guidelines.md
+    unregisterHook(join(home, '.claude', 'settings.json'));
+    removed.push('~/.claude/settings.json (PostToolUse hook)');
+
+    const globalClaude = join(home, '.claude', 'CLAUDE.md');
+    if (existsSync(globalClaude)) {
+      let content = readFileSync(globalClaude, 'utf-8');
+      const before = content;
+      content = content.replace(/<!-- brand-voice:start[^]*?<!-- brand-voice:end -->\n?/g, '');
+      if (content !== before) {
+        writeFileSync(globalClaude, content, 'utf-8');
+        removed.push('~/.claude/CLAUDE.md (brand-voice section)');
+      }
+    }
+
+    tryRemove('~/.claude/brand-guidelines.md', join(home, '.claude', 'brand-guidelines.md'));
+  } else {
+    // Project scope
+    unregisterHook(join(cwd, '.claude', 'settings.json'));
+    removed.push('.claude/settings.json (PostToolUse hook)');
+
+    unregisterMcp(join(cwd, '.mcp.json'));
+    removed.push('.mcp.json (MCP server entry)');
+
+    const projectClaude = join(cwd, 'CLAUDE.md');
+    if (existsSync(projectClaude)) {
+      let content = readFileSync(projectClaude, 'utf-8');
+      const before = content;
+      content = content.replace(/<!-- brand-voice:start[^]*?<!-- brand-voice:end -->\n?/g, '');
+      if (content !== before) {
+        writeFileSync(projectClaude, content, 'utf-8');
+        removed.push('CLAUDE.md (brand-voice section)');
+      }
+    }
+
+    tryRemove('brand-guidelines.md', join(cwd, 'brand-guidelines.md'));
+  }
+
+  console.log('brand-voice uninstalled.\n');
+  if (removed.length) console.log('Removed:\n' + removed.map(r => `  - ${r}`).join('\n'));
+  if (skipped.length) console.log('\nNot found (skipped):\n' + skipped.map(s => `  - ${s}`).join('\n'));
+  console.log('\nTo remove the package itself:\n  npm uninstall -g brand-voice');
+}
+
+// ---------------------------------------------------------------------------
+
 function printUsage(): void {
   console.log(`Usage: brand-voice <command> [options]
 
 Commands:
   check [file]              Check a file or all .md files in cwd
   setup                     Print instructions to run /brand-voice-setup in Claude Code
+  uninstall                 Remove hook, MCP entry, skill, and brand-guidelines.md (project scope)
+  uninstall --global        Same, but targets ~/.claude/ instead of the current project
   import <file>             Extract AI-relevant sections from a brand guidelines file
   baseline --save           Save current violation count as ratchet baseline
   vale-sync                 Check that the Vale binary is available
@@ -372,6 +443,12 @@ const command = argv[0];
 switch (command) {
   case 'setup': {
     cmdSetup();
+    break;
+  }
+
+  case 'uninstall': {
+    const isGlobal = argv.includes('--global');
+    cmdUninstall({ global: isGlobal });
     break;
   }
 

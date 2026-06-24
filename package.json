@@ -1,6 +1,6 @@
 {
   "name": "brand-voice",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "mcpName": "io.github.zoharbabin/brand-voice",
   "description": "Enforce brand writing guidelines in Claude Code — PostToolUse hook + MCP server",
   "type": "module",
