@@ -1,0 +1,120 @@
+name: 🏷️ Pre-release
+
+on:
+  push:
+    branches:
+      - 'release/*'
+      - 'beta/*'
+      - 'rc/*'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish-prerelease:
+    name: 🚀 Build & Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧪 Run tests
+        run: npm test
+        env:
+          NODE_ENV: test
+
+      - name: 🔨 Build
+        run: npm run build
+
+      - name: 🏷️ Determine pre-release version
+        id: version
+        run: |
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          BASE_VERSION=$(node -p "require('./package.json').version")
+
+          if [[ $BRANCH_NAME == release/* ]]; then
+            VERSION_SUFFIX="rc"
+            NPM_TAG="rc"
+          elif [[ $BRANCH_NAME == beta/* ]]; then
+            VERSION_SUFFIX="beta"
+            NPM_TAG="beta"
+          elif [[ $BRANCH_NAME == rc/* ]]; then
+            VERSION_SUFFIX="rc"
+            NPM_TAG="rc"
+          fi
+
+          EXISTING_COUNT=$(npm view brand-voice versions --json 2>/dev/null | jq -r ".[] | select(startswith(\"${BASE_VERSION}-${VERSION_SUFFIX}\"))" 2>/dev/null | wc -l || echo "0")
+          NEXT_COUNT=$((EXISTING_COUNT + 1))
+          PRERELEASE_VERSION="${BASE_VERSION}-${VERSION_SUFFIX}.${NEXT_COUNT}"
+
+          echo "version=${PRERELEASE_VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${NPM_TAG}" >> $GITHUB_OUTPUT
+          echo "suffix=${VERSION_SUFFIX}" >> $GITHUB_OUTPUT
+
+          npm version $PRERELEASE_VERSION --no-git-tag-version
+
+      - name: 📦 Publish pre-release to npm
+        run: npm publish --tag ${{ steps.version.outputs.tag }} --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: 🏷️ Create git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Pre-release v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}" || echo "⚠️ Tag may already exist"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📝 Create GitHub pre-release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const version = '${{ steps.version.outputs.version }}';
+            const suffix = '${{ steps.version.outputs.suffix }}';
+            const tag = '${{ steps.version.outputs.tag }}';
+
+            await github.rest.repos.createRelease({
+              owner, repo,
+              tag_name: `v${version}`,
+              name: `v${version}`,
+              body: `## ${suffix.charAt(0).toUpperCase() + suffix.slice(1)} Release v${version}
+
+This is a pre-release build for testing and validation.
+
+## 📦 Installation
+\`\`\`bash
+npm install brand-voice@${tag}
+\`\`\`
+
+## ⚠️ Pre-release Notice
+Not recommended for production. Test thoroughly before deploying.
+
+## 🔗 Links
+- [npm package](https://www.npmjs.com/package/brand-voice/v/${version})
+- [Documentation](https://github.com/${context.repo.owner}/${context.repo.repo}#readme)`,
+              prerelease: true,
+              draft: false
+            });
+
+      - name: 📋 Summary
+        run: |
+          echo "## 🏷️ Pre-release Published" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: \`${{ steps.version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Install**: \`npm install brand-voice@${{ steps.version.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: \`${GITHUB_REF#refs/heads/}\`" >> $GITHUB_STEP_SUMMARY

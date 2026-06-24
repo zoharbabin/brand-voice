@@ -1,0 +1,56 @@
+{
+  "manifest_version": "0.4",
+  "name": "brand-voice",
+  "display_name": "Brand Voice",
+  "version": "0.1.0",
+  "description": "Enforce brand writing guidelines in Claude Code — PostToolUse hook + MCP server",
+  "long_description": "brand-voice enforces your brand writing guidelines automatically as Claude writes Markdown.\n\n**Features:**\n- PostToolUse hook intercepts every Write/Edit/MultiEdit on .md/.mdx files\n- Checks forbidden terms, avoid terms, sentence length, passive voice, and readability grade\n- Exits with code 2 on violations so Claude auto-corrects before saving\n- MCP server with analyze_readability (read-only) and apply_suggestions (word-level fixes)\n- CLI for CI pipelines: check, baseline ratchet, GitHub PR annotations\n- /brand-voice-setup skill for guided onboarding — reads existing brand docs or interviews in 4 questions\n- Visual identity support: colors, fonts, and logo URLs in the same guidelines file",
+  "author": {
+    "name": "Zohar Babin",
+    "url": "https://github.com/zoharbabin"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zoharbabin/brand-voice.git"
+  },
+  "homepage": "https://github.com/zoharbabin/brand-voice",
+  "documentation": "https://github.com/zoharbabin/brand-voice#readme",
+  "support": "https://github.com/zoharbabin/brand-voice/issues",
+  "license": "MIT",
+  "keywords": [
+    "brand-voice",
+    "writing",
+    "style-guide",
+    "readability",
+    "markdown",
+    "claude-code",
+    "hook",
+    "mcp"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/mcp.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/mcp.js"]
+    }
+  },
+  "tools": [
+    {
+      "name": "analyze_readability",
+      "description": "Check a Markdown file or inline text for brand-voice violations and readability scores. Returns violations (line, severity, rule, message), Flesch/FK metrics, and visual identity palette. Read-only, idempotent."
+    },
+    {
+      "name": "apply_suggestions",
+      "description": "Apply safe word-level substitutions to fix forbidden/avoid terms (e.g. utilize→use, leverage→use). Supports dryRun to preview as a diff. Idempotent, does not fix sentence length or passive voice."
+    }
+  ],
+  "tools_generated": false,
+  "compatibility": {
+    "claude_desktop": ">=1.0.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

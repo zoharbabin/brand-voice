@@ -1,0 +1,104 @@
+name: 🚨 Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_to_rollback:
+        description: 'Version to rollback to (e.g., 0.1.0)'
+        required: true
+        type: string
+      rollback_reason:
+        description: 'Reason for rollback'
+        required: true
+        type: string
+      deprecate_versions:
+        description: 'Comma-separated versions to deprecate (e.g., 0.1.1,0.1.2)'
+        required: false
+        type: string
+
+jobs:
+  rollback:
+    name: ⏪ Rollback to Safe Version
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: 🔍 Validate rollback version
+        run: |
+          ROLLBACK_VERSION="${{ github.event.inputs.version_to_rollback }}"
+          if ! npm view brand-voice@$ROLLBACK_VERSION version; then
+            echo "❌ Version $ROLLBACK_VERSION not found on npm"
+            exit 1
+          fi
+          echo "✅ Version $ROLLBACK_VERSION valid for rollback"
+
+      - name: ⚠️ Deprecate bad versions
+        if: github.event.inputs.deprecate_versions != ''
+        run: |
+          IFS=',' read -ra VERSIONS <<< "${{ github.event.inputs.deprecate_versions }}"
+          for version in "${VERSIONS[@]}"; do
+            echo "Deprecating: $version"
+            npm deprecate brand-voice@$version "${{ github.event.inputs.rollback_reason }}" || echo "⚠️ Could not deprecate $version"
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: ⏪ Restore version as latest
+        run: npm dist-tag add brand-voice@${{ github.event.inputs.version_to_rollback }} latest
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: ✅ Verify rollback
+        run: |
+          CURRENT=$(npm view brand-voice@latest version)
+          EXPECTED="${{ github.event.inputs.version_to_rollback }}"
+          if [[ "$CURRENT" == "$EXPECTED" ]]; then
+            echo "✅ Rollback successful: latest is now $CURRENT"
+          else
+            echo "❌ Rollback failed: latest is $CURRENT, expected $EXPECTED"
+            exit 1
+          fi
+
+      - name: 📝 Create rollback issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Emergency Rollback: v${{ github.event.inputs.version_to_rollback }}`,
+              body: `## Rollback Details
+
+- **Rolled back to**: v${{ github.event.inputs.version_to_rollback }}
+- **Reason**: ${{ github.event.inputs.rollback_reason }}
+- **Deprecated versions**: ${{ github.event.inputs.deprecate_versions || 'None' }}
+- **Triggered by**: @${{ github.actor }}
+- **Time**: ${new Date().toISOString()}
+
+## Verification
+- [x] Rollback version exists on npm
+- [x] Latest tag updated
+- [x] Problematic versions deprecated (if specified)
+
+## Next Steps
+- [ ] Investigate root cause
+- [ ] Prepare hotfix if needed
+- [ ] Plan next release
+
+\`\`\`bash
+npm install -g brand-voice@latest
+\`\`\``,
+              labels: ['critical', 'rollback', 'incident']
+            });
+
+      - name: 📋 Summary
+        run: |
+          echo "## 🚨 Rollback Completed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Rolled back to**: \`v${{ github.event.inputs.version_to_rollback }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Reason**: ${{ github.event.inputs.rollback_reason }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Current latest**: \`$(npm view brand-voice@latest version)\`" >> $GITHUB_STEP_SUMMARY

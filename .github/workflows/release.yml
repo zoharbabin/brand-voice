@@ -1,0 +1,101 @@
+name: 📦 Publish · npm
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  attestations: write
+  contents: write
+  id-token: write   # Required for npm OIDC trusted publishing
+
+jobs:
+  publish-release:
+    name: 🚀 Build, Test & Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧪 Run tests
+        run: npm test
+        env:
+          NODE_ENV: test
+
+      - name: 🔨 Build
+        run: npm run build
+
+      - name: 🔍 Validate version
+        id: version
+        run: |
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          RELEASE_VERSION=${GITHUB_REF#refs/tags/v}
+
+          if [[ "$PACKAGE_VERSION" != "$RELEASE_VERSION" ]]; then
+            echo "❌ Version mismatch: package.json ($PACKAGE_VERSION) != release tag ($RELEASE_VERSION)"
+            exit 1
+          fi
+
+          echo "version=${PACKAGE_VERSION}" >> $GITHUB_OUTPUT
+          echo "✅ Version validation passed: $PACKAGE_VERSION"
+
+      - name: 📦 Publish to npm
+        run: npm publish --tag latest --access public --provenance
+
+      - name: 🔏 Create SLSA attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            dist/cli.js
+            dist/check.js
+            dist/mcp.js
+            package.json
+
+      - name: 📝 Update release notes
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const release_id = context.payload.release.id;
+            const version = '${{ steps.version.outputs.version }}';
+            const repository = '${{ github.repository }}';
+
+            const installSection = [
+              '',
+              '## 📦 Installation',
+              '```bash',
+              `npm install -g brand-voice@${version}`,
+              '```',
+              '',
+              '## 🔗 Links',
+              `- [npm package](https://www.npmjs.com/package/brand-voice/v/${version})`,
+              `- [Documentation](https://github.com/${repository}#readme)`,
+            ].join('\n');
+
+            const currentBody = context.payload.release.body || '';
+            await github.rest.repos.updateRelease({
+              owner,
+              repo,
+              release_id,
+              body: currentBody + installSection
+            });
+
+      - name: 📋 Summary
+        run: |
+          echo "## 📦 Release Published" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Install**: \`npm install -g brand-voice@latest\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release**: [${{ github.event.release.name }}](${{ github.event.release.html_url }})" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,118 @@
+name: 🧩 Publish · MCPB
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v0.2.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-mcpb:
+    name: 🔨 Build Bundle
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔨 Build TypeScript
+        run: npm run build
+
+      - name: 🧩 Install MCPB CLI
+        run: npm install -g @anthropic-ai/mcpb
+
+      - name: 🔍 Validate manifest
+        run: mcpb validate manifest.json
+
+      - name: 🏷️ Get version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            VERSION="${{ github.event.release.tag_name }}"
+          else
+            VERSION="v$(node -p "require('./package.json').version")"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: 🏷️ Update manifest version
+        run: |
+          VERSION_NUMBER="${{ steps.version.outputs.version_number }}"
+          jq --arg v "$VERSION_NUMBER" '.version = $v' manifest.json > manifest.tmp && mv manifest.tmp manifest.json
+
+      - name: 📦 Pack bundle
+        run: |
+          mcpb pack . brand-voice.mcpb
+          ls -lh *.mcpb
+
+      - name: ℹ️ Bundle info
+        run: mcpb info brand-voice.mcpb
+
+      - name: 💾 Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: brand-voice-${{ steps.version.outputs.version }}.mcpb
+          path: brand-voice.mcpb
+          retention-days: 90
+
+      - name: 📤 Attach to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: brand-voice.mcpb
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  verify-bundle:
+    name: ✅ Verify · ${{ matrix.os }}
+    needs: build-mcpb
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 📥 Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: brand-voice-${{ needs.build-mcpb.outputs.version }}.mcpb
+          path: .
+
+      - name: 🧩 Install MCPB CLI
+        run: npm install -g @anthropic-ai/mcpb
+
+      - name: ℹ️ Verify bundle
+        run: mcpb info brand-voice.mcpb
+
+      - name: 📦 Unpack and validate
+        shell: bash
+        run: |
+          mcpb unpack brand-voice.mcpb unpacked
+          ls -la unpacked/
+          cat unpacked/manifest.json | head -20
