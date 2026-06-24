@@ -1,0 +1,66 @@
+{
+  "name": "brand-voice",
+  "version": "0.1.0",
+  "description": "Enforce brand writing guidelines in Claude Code — PostToolUse hook + MCP server",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js",
+    "./mcp": "./dist/mcp.js",
+    "./check": "./dist/check.js"
+  },
+  "bin": {
+    "brand-voice": "./dist/cli.js",
+    "brand-voice-check": "./dist/check.js",
+    "brand-voice-mcp": "./dist/mcp.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest --testPathPattern='src/'",
+    "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run typecheck"
+  },
+  "files": [
+    "dist/",
+    "example/",
+    "skills/",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "brand-voice",
+    "claude-code",
+    "mcp",
+    "writing",
+    "style",
+    "readability",
+    "hook",
+    "markdown"
+  ],
+  "author": "Zohar Babin",
+  "license": "MIT",
+  "homepage": "https://github.com/zoharbabin/brand-voice#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zoharbabin/brand-voice.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zoharbabin/brand-voice/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "flesch": "^2.0.1",
+    "flesch-kincaid": "^2.0.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
