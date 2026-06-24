@@ -88,25 +88,29 @@ jobs:
             const suffix = '${{ steps.version.outputs.suffix }}';
             const tag = '${{ steps.version.outputs.tag }}';
 
+            const label = suffix.charAt(0).toUpperCase() + suffix.slice(1);
+            const body = [
+              `## ${label} Release v${version}`,
+              '',
+              'This is a pre-release build for testing and validation.',
+              '',
+              '## 📦 Installation',
+              '```bash',
+              `npm install brand-voice@${tag}`,
+              '```',
+              '',
+              '## ⚠️ Pre-release Notice',
+              'Not recommended for production. Test thoroughly before deploying.',
+              '',
+              '## 🔗 Links',
+              `- [npm package](https://www.npmjs.com/package/brand-voice/v/${version})`,
+              `- [Documentation](https://github.com/${context.repo.owner}/${context.repo.repo}#readme)`,
+            ].join('\n');
             await github.rest.repos.createRelease({
               owner, repo,
               tag_name: `v${version}`,
               name: `v${version}`,
-              body: `## ${suffix.charAt(0).toUpperCase() + suffix.slice(1)} Release v${version}
-
-This is a pre-release build for testing and validation.
-
-## 📦 Installation
-\`\`\`bash
-npm install brand-voice@${tag}
-\`\`\`
-
-## ⚠️ Pre-release Notice
-Not recommended for production. Test thoroughly before deploying.
-
-## 🔗 Links
-- [npm package](https://www.npmjs.com/package/brand-voice/v/${version})
-- [Documentation](https://github.com/${context.repo.owner}/${context.repo.repo}#readme)`,
+              body,
               prerelease: true,
               draft: false
             });
