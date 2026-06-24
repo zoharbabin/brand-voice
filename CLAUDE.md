@@ -17,7 +17,7 @@ Public programmatic API is exported from `src/index.ts`. All types live in `src/
 ```sh
 npm run build        # tsc — must produce zero errors
 npm run typecheck    # tsc --noEmit — strict mode
-npm test             # Jest — all 23 tests must pass
+npm test             # Jest — all tests must pass
 ```
 
 No shortcut exists that runs all three; run them in order. The CI workflow runs build + typecheck + test on Node 18, 20, and 22.
@@ -36,7 +36,7 @@ src/
     load-guidelines.ts      brand-guidelines.md search-path resolution
     parse-guidelines.ts     Markdown → BrandGuidelines parser
     analyzer.test.ts        Jest tests for analyzer
-    parse-guidelines.test.ts  Jest tests for parser (23 tests total)
+    parse-guidelines.test.ts  Jest tests for parser
   setup/
     generate-claude-md.ts   CLAUDE.md injection generator
     generate-vale-ini.ts    .vale.ini + BrandVoice Vale style generator

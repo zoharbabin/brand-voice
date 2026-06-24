@@ -67,7 +67,7 @@ Exit 1 is never used by the hook (it would abort the session rather than signal 
 ### Example hook output
 
 ```
-Brand Voice violations in docs/quickstart.md:
+Brand Voice violations in quickstart.md:
   Line 12: Forbidden term: "simply"
   Line 23: Avoid term: "utilize"
   Line 31: Sentence too long: 34 words (max 25). Sentence: "Our platform..."
@@ -131,6 +131,8 @@ file where LLM attention is highest — restating key rules here counters
 
 The `## Quick Reference` section is required. It restates the most critical rules at the end of the file, where attention is strongest, to reinforce them against context-window attention drop-off.
 
+**Section name aliases:** `## On-Brand Examples` and `## Off-Brand Examples` are accepted as aliases for `## On-Tone Examples` and `## Off-Tone Examples`. All other section names are case-insensitive exact matches.
+
 See [`example/brand-guidelines.md`](example/brand-guidelines.md) for a complete working example.
 
 ### Guidelines search path
@@ -180,7 +182,7 @@ Apply safe word-level substitutions to fix common violations (forbidden/avoid te
 | `file` | string | yes | Path to the file to fix |
 | `dryRun` | boolean | no | Return a diff without writing (default: false) |
 
-**Returns:** `{ changes[], diff? }` (dryRun) or `{ filePath, changes[], message }` (live)
+**Returns:** `{ dryRun: true, diff, changes[] }` (dryRun) or `{ filePath, changes[], message }` (live)
 
 **Tip:** Call `apply_suggestions` with `dryRun: true` first to preview changes, then again without `dryRun` to apply them.
 
@@ -277,14 +279,11 @@ if (guidelines) {
 
 See [src/types.ts](src/types.ts) for the full type definitions.
 
-## Stack
+## Requirements
 
-All packages MIT licensed.
-
-| Package | Role |
-|---|---|
-| `flesch` + `flesch-kincaid` | Flesch Reading Ease and Flesch-Kincaid grade scoring |
-| `@modelcontextprotocol/sdk` | MCP server stdio transport |
+- **Node.js 18+** — required runtime
+- **`brand-guidelines.md`** — required for enforcement; created by `/brand-voice-setup`
+- **Vale** (optional) — only needed for `vale-sync` command; not required for the hook, MCP server, or CLI check
 
 ## Contributing
 
