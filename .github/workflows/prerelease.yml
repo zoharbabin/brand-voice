@@ -9,7 +9,7 @@ on:
 
 permissions:
   contents: write
-  id-token: write
+  id-token: write   # Required for npm OIDC trusted publishing
 
 jobs:
   publish-prerelease:
@@ -67,8 +67,6 @@ jobs:
 
       - name: 📦 Publish pre-release to npm
         run: npm publish --tag ${{ steps.version.outputs.tag }} --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: 🏷️ Create git tag
         run: |
