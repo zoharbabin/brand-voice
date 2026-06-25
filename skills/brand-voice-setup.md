@@ -40,15 +40,25 @@ If user says yes to missing pieces, ask only for the gaps (max 2 follow-up quest
 Ask: "Do you have a company website or domain I can research? (e.g., acme.com) Or I can ask you 4 quick questions instead."
 
 **If user provides a domain and the `brand_research` MCP tool is available:**
-Call `brand_research` with `url: <domain>`, `depth: "standard"`. Map the result using these exact field paths:
-- `tone_of_voice.summary` + `tone_of_voice.attributes` → Tone & Voice bullets
-- `tone_of_voice.dos_and_donts.dos` → Vocabulary Always use; `dos_and_donts.donts` → Vocabulary Avoid
+
+**Phase 1 — structured extraction:**
+Call `brand_research` with `url: <domain>`, `depth: "full"`. From the response, map:
 - `colors.primary`, `.secondary`, `.accent`, `.background`, `.text` → Visual Identity colors (hex strings)
 - `logos.primary.url`, `logos.dark.url`, `logos.icon.url` → Visual Identity logo URLs
 - `typography.heading.family`, `typography.body.family` → Visual Identity fonts
-- `identity.name` → add to Vocabulary Always use for canonical brand-name spelling
+- `identity.name` → canonical brand-name spelling (add to Vocabulary Always use)
 
-If the `brand_guidelines` MCP Prompt is also available, you may alternatively use it with `company: <domain>`, `use_case: "full_guidelines"`, `depth: "standard"` — it wraps `brand_research` and returns interpreted guidance ready to paste directly into brand-guidelines.md sections.
+**Phase 2 — brand portal deep-read (if available):**
+If the response includes a `brand_portal_resource` field (a `research://artifact/<hash>` URI):
+1. Call `ReadMcpResourceTool` with `server: "web-researcher"` and `uri: <brand_portal_resource>` to read the brand portal index
+2. Scan the returned content for navigation links whose labels suggest voice/tone/writing content — look for headings or links containing words like: "voice", "tone", "sound", "writing", "language", "style", "words", "grammar", "clarity", "warmth", "energy"
+3. For each discovered sub-page URL (up to 6), call `scrape_page` with that URL and extract: tone descriptors, dos/don'ts, word choices, example sentences, and any explicit grammar or style rules
+4. Synthesise all scraped sub-page content as the primary source for tone_of_voice — this is richer than the top-level response fields
+
+**Phase 3 — fallback mapping (when no brand portal or sub-pages are found):**
+Use top-level response fields:
+- `tone_of_voice.summary` + `tone_of_voice.attributes` → Tone & Voice bullets
+- `tone_of_voice.dos_and_donts.dos` → Vocabulary Always use; `dos_and_donts.donts` → Vocabulary Avoid
 
 Show a summary of what was found and ask: "Does this look right? Any corrections or additions?"
 
