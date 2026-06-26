@@ -10,16 +10,9 @@
 
 Every time Claude writes or edits a Markdown file, `brand-voice` checks it against your brand guidelines and signals Claude to fix violations **before** the file saves. No manual review. No rule reminders in every prompt.
 
-```
-Brand Voice violations in quickstart.md:
-  Line 12  error    forbidden-term   Forbidden term: "simply"
-  Line 23  warning  avoid-term       Avoid term: "utilize"
-  Line 31  warning  sentence-length  Sentence too long: 34 words (max 25)
-  Line 45  warning  passive-voice    Possible passive voice: "is configured"
-Fix these violations, then the file will be saved.
-```
+![brand-voice demo](docs/demo.svg)
 
-Claude reads this output, corrects the violations, and retries the write — automatically.
+Claude reads the violation list, corrects the file, and retries the write — automatically.
 
 ---
 

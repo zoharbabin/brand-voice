@@ -2,7 +2,7 @@
   "name": "brand-voice",
   "version": "0.1.7",
   "mcpName": "io.github.zoharbabin/brand-voice",
-  "description": "Enforce brand writing guidelines in Claude Code — PostToolUse hook + MCP server",
+  "description": "Stop Claude from using banned brand terms. Automatic brand voice enforcement for Claude Code — PostToolUse hook, MCP server, and CI pipeline check.",
   "type": "module",
   "exports": {
     ".": "./dist/index.js",
