@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "brand-voice",
   "display_name": "Brand Voice",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Enforce brand writing guidelines in Claude Code — PostToolUse hook + MCP server",
   "long_description": "brand-voice enforces your brand writing guidelines automatically as Claude writes Markdown.\n\n**Features:**\n- PostToolUse hook intercepts every Write/Edit/MultiEdit on .md/.mdx files\n- Checks forbidden terms, avoid terms, sentence length, passive voice, and readability grade\n- Exits with code 2 on violations so Claude auto-corrects before saving\n- MCP server with analyze_readability (read-only) and apply_suggestions (word-level fixes)\n- CLI for CI pipelines: check, baseline ratchet, GitHub PR annotations\n- /brand-voice-setup skill for guided onboarding — reads existing brand docs or interviews in 4 questions\n- Visual identity support: colors, fonts, and logo URLs in the same guidelines file",
   "author": {

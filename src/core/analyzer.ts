@@ -2,6 +2,47 @@ import type { BrandGuidelines, Violation, AnalysisResult, ReadabilityScores } fr
 import { flesch } from 'flesch';
 import { fleschKincaid } from 'flesch-kincaid';
 
+// Extract prose-only content: skip fenced/indented code blocks and table rows.
+function extractProse(lines: string[]): { proseIndices: Set<number>; proseText: string } {
+  const proseIndices = new Set<number>();
+  let inFencedBlock = false;
+  let fenceMarker = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    const fenceMatch = line.match(/^(`{3,}|~{3,})/);
+    if (fenceMatch) {
+      if (!inFencedBlock) {
+        inFencedBlock = true;
+        fenceMarker = fenceMatch[1][0].repeat(fenceMatch[1].length);
+      } else if (line.trimEnd().startsWith(fenceMarker)) {
+        inFencedBlock = false;
+        fenceMarker = '';
+      }
+      continue;
+    }
+
+    if (inFencedBlock) continue;
+
+    // Skip indented code blocks (4 spaces or 1 tab)
+    if (/^( {4}|\t)/.test(line)) continue;
+
+    // Skip table rows and separator lines
+    if (/^\s*\|/.test(line) || /^\s*:?-+:?\s*(\|\s*:?-+:?\s*)*$/.test(line)) continue;
+
+    proseIndices.add(i);
+  }
+
+  const proseText = lines.filter((_, i) => proseIndices.has(i)).join('\n');
+  return { proseIndices, proseText };
+}
+
+// Strip inline code spans before term-matching so `utilize` in code isn't flagged.
+function stripInlineCode(line: string): string {
+  return line.replace(/`[^`\n]+`/g, ' ');
+}
+
 // Count vowel groups in a word as syllable estimate, minimum 1 per word.
 function countSyllables(word: string): number {
   const stripped = word.toLowerCase().replace(/[^a-z]/g, '');
@@ -47,10 +88,12 @@ export function analyzeText(
 ): AnalysisResult {
   const violations: Violation[] = [];
   const lines = text.split('\n');
-  const sentences = splitSentences(text);
-  const words = splitWords(text);
 
-  // --- Readability scores (whole text) ---
+  const { proseIndices, proseText } = extractProse(lines);
+  const sentences = splitSentences(proseText);
+  const words = splitWords(proseText);
+
+  // --- Readability scores (prose only) ---
   const sentenceCount = sentences.length || 1;
   const wordCountTotal = words.length || 1;
   const syllableCount = words.reduce((sum, w) => sum + countSyllables(w), 0);
@@ -67,13 +110,14 @@ export function analyzeText(
     avgWordsPerSentence: wordCountTotal / sentenceCount,
   };
 
-  // --- 1. Forbidden / avoid terms ---
+  // --- 1. Forbidden / avoid terms (prose lines only, inline code stripped) ---
   const forbidden = guidelines.vocabulary?.forbidden ?? [];
   const avoid = guidelines.vocabulary?.avoid ?? [];
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    if (!proseIndices.has(lineIdx)) continue;
     const lineNum = lineIdx + 1;
-    const lineText = lines[lineIdx];
+    const lineText = stripInlineCode(lines[lineIdx]);
 
     for (const term of forbidden) {
       if (wholeWordRegex(term).test(lineText)) {
@@ -98,13 +142,12 @@ export function analyzeText(
     }
   }
 
-  // --- 2. Sentence length ---
+  // --- 2. Sentence length (prose only) ---
   const maxWords = guidelines.voice?.maxSentenceWords ?? 25;
 
   for (const sentence of sentences) {
     const wc = wordCount(sentence);
     if (wc > maxWords) {
-      // Find the line number where this sentence starts.
       const firstWords = sentence.split(/\s+/).slice(0, 4).join(' ');
       const lineNum = findLineForText(lines, firstWords);
       violations.push({
@@ -116,12 +159,13 @@ export function analyzeText(
     }
   }
 
-  // --- 3. Passive voice ---
+  // --- 3. Passive voice (prose lines only, inline code stripped) ---
   if (guidelines.voice?.activeVoice !== false) {
     const passivePattern = /\b(am|is|are|was|were|be|been|being)\s+\w+ed\b/gi;
     for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+      if (!proseIndices.has(lineIdx)) continue;
       const lineNum = lineIdx + 1;
-      const lineText = lines[lineIdx];
+      const lineText = stripInlineCode(lines[lineIdx]);
       const match = passivePattern.exec(lineText);
       if (match) {
         violations.push({
@@ -132,19 +176,18 @@ export function analyzeText(
           severity: 'warning',
         });
       }
-      // Reset lastIndex after exec loop
       passivePattern.lastIndex = 0;
     }
   }
 
-  // --- 4. Readability per sentence ---
+  // --- 4. Readability per sentence (prose only) ---
   const readabilityTarget = guidelines.formatting?.readabilityTarget;
   if (readabilityTarget) {
     const gradeTarget = parseGradeTarget(readabilityTarget);
     if (gradeTarget !== null) {
       for (const sentence of sentences) {
         const sw = splitWords(sentence);
-        if (sw.length < 3) continue; // too short to score meaningfully
+        if (sw.length < 3) continue;
         const sc = 1;
         const wc2 = sw.length;
         const syl = sw.reduce((sum, w) => sum + countSyllables(w), 0);

@@ -93,4 +93,44 @@ describe('analyzeText', () => {
     expect(result.passed).toBe(true);
     expect(result.violations.some((v) => v.severity === 'warning')).toBe(true);
   });
+
+  it('does not flag terms inside fenced code blocks', () => {
+    const text = 'Good prose here.\n```js\nconst x = simply(utilize());\n```\nMore prose.';
+    const result = analyzeText(text, FILE, guidelines);
+    expect(result.violations.filter(v => v.rule === 'forbidden-term' || v.rule === 'avoid-term')).toHaveLength(0);
+  });
+
+  it('does not flag terms inside indented code blocks', () => {
+    const text = 'Good prose here.\n    const x = simply(utilize());\nMore prose.';
+    const result = analyzeText(text, FILE, guidelines);
+    expect(result.violations.filter(v => v.rule === 'forbidden-term' || v.rule === 'avoid-term')).toHaveLength(0);
+  });
+
+  it('does not flag terms inside inline code spans', () => {
+    const text = 'Call the `utilize()` method or the `simply` helper.';
+    const result = analyzeText(text, FILE, guidelines);
+    expect(result.violations.filter(v => v.rule === 'forbidden-term' || v.rule === 'avoid-term')).toHaveLength(0);
+  });
+
+  it('does not flag sentence length on table rows', () => {
+    const text = [
+      '| Column A | Column B | Column C | Column D | Column E | Column F | Column G |',
+      '|---|---|---|---|---|---|---|',
+      '| val1 | val2 | val3 | val4 | val5 | val6 | val7 |',
+    ].join('\n');
+    const result = analyzeText(text, FILE, guidelines);
+    expect(result.violations.filter(v => v.rule === 'sentence-length')).toHaveLength(0);
+  });
+
+  it('does not flag passive voice inside fenced code blocks', () => {
+    const text = 'Good intro.\n```\nif (value is configured by user) {}\n```\nDone.';
+    const result = analyzeText(text, FILE, guidelines);
+    expect(result.violations.filter(v => v.rule === 'passive-voice')).toHaveLength(0);
+  });
+
+  it('still flags terms in prose after a code block', () => {
+    const text = '```\nclean code\n```\nYou should utilize this feature.';
+    const result = analyzeText(text, FILE, guidelines);
+    expect(result.violations.filter(v => v.rule === 'avoid-term')).toHaveLength(1);
+  });
 });
