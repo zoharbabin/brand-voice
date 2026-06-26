@@ -2,6 +2,17 @@ import type { BrandGuidelines, Violation, AnalysisResult, ReadabilityScores } fr
 import { flesch } from 'flesch';
 import { fleschKincaid } from 'flesch-kincaid';
 
+const DISABLE_LINE_COMMENT = /<!--\s*brand-voice-disable-line\s*-->/i;
+
+// Return the set of 0-based line indices marked with brand-voice-disable-line.
+function disabledLineIndices(lines: string[]): Set<number> {
+  const disabled = new Set<number>();
+  for (let i = 0; i < lines.length; i++) {
+    if (DISABLE_LINE_COMMENT.test(lines[i])) disabled.add(i);
+  }
+  return disabled;
+}
+
 // Extract prose-only content: skip fenced/indented code blocks and table rows.
 function extractProse(lines: string[]): { proseIndices: Set<number>; proseText: string } {
   const proseIndices = new Set<number>();
@@ -86,8 +97,9 @@ export function analyzeText(
   filePath: string,
   guidelines: BrandGuidelines,
 ): AnalysisResult {
-  const violations: Violation[] = [];
+  const rawViolations: Violation[] = [];
   const lines = text.split('\n');
+  const disabled = disabledLineIndices(lines);
 
   const { proseIndices, proseText } = extractProse(lines);
   const sentences = splitSentences(proseText);
@@ -121,7 +133,7 @@ export function analyzeText(
 
     for (const term of forbidden) {
       if (wholeWordRegex(term).test(lineText)) {
-        violations.push({
+        rawViolations.push({
           line: lineNum,
           message: `Forbidden term: "${term}"`,
           rule: 'forbidden-term',
@@ -132,7 +144,7 @@ export function analyzeText(
 
     for (const term of avoid) {
       if (wholeWordRegex(term).test(lineText)) {
-        violations.push({
+        rawViolations.push({
           line: lineNum,
           message: `Avoid term: "${term}"`,
           rule: 'avoid-term',
@@ -150,7 +162,7 @@ export function analyzeText(
     if (wc > maxWords) {
       const firstWords = sentence.split(/\s+/).slice(0, 4).join(' ');
       const lineNum = findLineForText(lines, firstWords);
-      violations.push({
+      rawViolations.push({
         line: lineNum,
         message: `Sentence too long: ${wc} words (max ${maxWords}). Sentence: "${sentence.slice(0, 80)}${sentence.length > 80 ? '…' : ''}"`,
         rule: 'sentence-length',
@@ -168,7 +180,7 @@ export function analyzeText(
       const lineText = stripInlineCode(lines[lineIdx]);
       const match = passivePattern.exec(lineText);
       if (match) {
-        violations.push({
+        rawViolations.push({
           line: lineNum,
           column: match.index + 1,
           message: `Possible passive voice: "${match[0]}"`,
@@ -195,7 +207,7 @@ export function analyzeText(
         if (sentFk > gradeTarget) {
           const firstWords = sw.slice(0, 4).join(' ');
           const lineNum = findLineForText(lines, firstWords);
-          violations.push({
+          rawViolations.push({
             line: lineNum,
             message: `Readability grade ${sentFk.toFixed(1)} exceeds target ${gradeTarget} (${readabilityTarget}): "${sentence.slice(0, 80)}${sentence.length > 80 ? '…' : ''}"`,
             rule: 'readability-grade',
@@ -205,6 +217,8 @@ export function analyzeText(
       }
     }
   }
+
+  const violations = rawViolations.filter(v => !disabled.has(v.line - 1));
 
   return {
     filePath,

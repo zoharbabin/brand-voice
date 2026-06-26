@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, existsSync, readdirSync, statSync, rmSync 
 import { join, resolve, extname } from 'path';
 import { loadGuidelines } from './core/load-guidelines.js';
 import { analyzeText } from './core/analyzer.js';
+import { loadIgnorePatterns, isIgnored } from './core/ignore.js';
 import { parseGuidelines } from './core/parse-guidelines.js';
 import { unregisterHook } from './setup/register-hook.js';
 import { unregisterMcp } from './setup/register-mcp.js';
@@ -218,6 +219,7 @@ function runCheck(files: string[], options: CheckOptions): { totalViolations: nu
     process.exit(1);
   }
 
+  const ignorePatterns = loadIgnorePatterns(cwd);
   let totalViolations = 0;
   let errorCount = 0;
 
@@ -236,6 +238,7 @@ function runCheck(files: string[], options: CheckOptions): { totalViolations: nu
   }
 
   for (const filePath of files) {
+    if (isIgnored(filePath, cwd, ignorePatterns)) continue;
     let text: string;
     try {
       text = readFileSync(filePath, 'utf-8');

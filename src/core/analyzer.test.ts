@@ -133,4 +133,17 @@ describe('analyzeText', () => {
     const result = analyzeText(text, FILE, guidelines);
     expect(result.violations.filter(v => v.rule === 'avoid-term')).toHaveLength(1);
   });
+
+  it('suppresses all violations on a line marked with brand-voice-disable-line', () => {
+    const text = 'It is simply easy to utilize this. <!-- brand-voice-disable-line -->';
+    const result = analyzeText(text, FILE, guidelines);
+    expect(result.violations).toHaveLength(0);
+  });
+
+  it('does not suppress violations on unmarked lines', () => {
+    const text = 'Clean line.\nIt is simply wrong. <!-- brand-voice-disable-line -->\nAlso simply wrong.';
+    const result = analyzeText(text, FILE, guidelines);
+    expect(result.violations.filter(v => v.rule === 'forbidden-term')).toHaveLength(1);
+    expect(result.violations[0].line).toBe(3);
+  });
 });

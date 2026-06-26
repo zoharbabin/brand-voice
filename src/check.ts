@@ -7,6 +7,7 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve, extname, basename } from 'path';
 import { loadGuidelines } from './core/load-guidelines.js';
 import { analyzeText } from './core/analyzer.js';
+import { loadIgnorePatterns, isIgnored } from './core/ignore.js';
 
 const filePath = process.env['CLAUDE_TOOL_OUTPUT_FILE'] ?? process.argv[2];
 
@@ -19,7 +20,15 @@ if (!existsSync(resolved)) process.exit(0);
 const ext = extname(resolved).toLowerCase();
 if (ext !== '.md' && ext !== '.mdx') process.exit(0);
 
-const guidelines = loadGuidelines(process.cwd());
+const cwd = process.cwd();
+
+const ignorePatterns = loadIgnorePatterns(cwd);
+if (isIgnored(resolved, cwd, ignorePatterns)) {
+  process.stdout.write(`brand-voice: ✓ ${basename(resolved)} (ignored)\n`);
+  process.exit(0);
+}
+
+const guidelines = loadGuidelines(cwd);
 if (!guidelines) {
   process.stdout.write('brand-voice: no brand-guidelines.md found, skipping check\n');
   process.exit(0);
