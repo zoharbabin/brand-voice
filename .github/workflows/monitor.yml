@@ -41,8 +41,9 @@ jobs:
             echo "✅ Package installs successfully"
 
             node -e "
+              const fs = require('fs');
               try {
-                const pkg = require('brand-voice/package.json');
+                const pkg = JSON.parse(fs.readFileSync('node_modules/brand-voice/package.json', 'utf8'));
                 console.log('✅ Package metadata accessible');
                 console.log('  Name:', pkg.name);
                 console.log('  Version:', pkg.version);
